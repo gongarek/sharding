@@ -15,4 +15,6 @@ class Configuration:
         # Block settings
         self.start_money = 100
         self.max_pay = 300
+        self.max_stake = 4000000    # tu bedzie trzeba wyliczyc z maksymalnej kasy w transakcji w blokach i ile ich jest
+        self.added_paid_every_tick = 20
         self.transactionsPerBlock = 5
