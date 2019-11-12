@@ -3,7 +3,8 @@ class Configuration:
         # Topology network                  # pewnie dla beacon chaina bedzie inaczej
         self.nodesPerRank = 6
         self.nodesPerBeacon = 10
-        self.intervalID = 1000
+        self.nodesPerNotarry = 15
+        self.intervalID = 1000    # lepiej tego nie zmianiac. Ładnie wyglada
 
         # Main chain settings
         self.nbPeers = 2

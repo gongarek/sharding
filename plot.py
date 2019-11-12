@@ -1,14 +1,21 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import warnings
+from communicator import Communicator
 
 
 def plot_network(peers_shard, rank):
+    comm = Communicator()
     g = nx.Graph()
     plt.figure(figsize=(5, 5))
     # plt.axis('off')
     fig = plt.gcf()
-    fig.canvas.set_window_title(f"shard {rank}")
+    if rank == 0:
+        fig.canvas.set_window_title("Łańcuch sygnalizacyjny")
+    # elif rank == (comm.nbRanks-1):
+    #     fig.canvas.set_window_title("Notariusze")
+    else:
+        fig.canvas.set_window_title(f"shard {rank}")
     node_ids = list(peers_shard)
     g.add_nodes_from(node_ids)
     g.add_edges_from([[k, i] for k, v in peers_shard.items() for i in v])

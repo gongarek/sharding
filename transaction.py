@@ -3,12 +3,9 @@ from communicator import Communicator
 
 
 class Transaction:
-    def __init__(self, trans_id, consignor_id, receiving_id, balance):  #to id_bedzie problem
+    def __init__(self, rank, sender, consignor_id, receiving_id, amount):  #to id_bedzie problem
         self.commu = Communicator()
-        if trans_id is None:
-            self.trans_id = f"{self.commu.rank}x{randrange(10**50, 10**51)}"
-        else:
-            self.trans_id = trans_id
+        self.trans_id = f"{rank}x{randrange(10**50, 10**51)}"
         self.consignor_id = consignor_id
         self.receiving_id = receiving_id
-        self.balance = balance
+        self.amount = amount
