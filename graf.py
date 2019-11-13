@@ -5,6 +5,7 @@ from block import Block
 from plot import plot_network
 from copy import deepcopy
 from time import time
+from transaction import Transaction
 
 from transaction import Transaction
 import merkletools
@@ -20,6 +21,7 @@ class Network:
         s.accounts_info = []
         s.shard_blockchain = []
         s.block = Block(None, None, time(), None, None)
+        s.transaction = Transaction(None, None, None)
 
     def boot_network(s):
         shard_node_ids = []
@@ -166,32 +168,38 @@ class Network:
         for u in keys:
             while len(s.peers_of_nodes_in_shard[u]) < s.config.nbPeers:
                 s.peers_of_nodes_in_shard[u].append(choice(list(set(keys) - {u} - set(s.peers_of_nodes_in_shard[u]))))
-        print(s.peers_of_nodes_in_shard, s.communicator.rank, "999")
 
     def send_transactions_to_beacon(s):
         for i in range(s.config.transactionsPerBlock):
             sender = choice(list(s.peers_of_nodes_in_shard))
-            transaction = {
-                "ID": f"{s.communicator.rank}x{randrange(10**50, 10**51)}",  # id transakcji -->numeru wysylajacego sharda
-                "sender": sender,
-                "receiver": choice(list((set(s.node_ids) - {sender}))),
-                "amount": choice(range(1, s.config.max_pay))
-            }
-            s.shard_transactions.append(transaction)
+            receiver = choice(list((set(s.node_ids) - {sender})))
+            amount = choice(range(1, s.config.max_pay))
+            s.transaction = Transaction(sender, receiver, amount)
+            # transaction = {
+            #     "ID": f"{s.communicator.rank}x{randrange(10**50, 10**51)}",  # id transakcji -->numeru wysylajacego sharda
+            #     "sender": sender,
+            #     "receiver": choice(list((set(s.node_ids) - {sender}))),
+            #     "amount": choice(range(1, s.config.max_pay))
+            # }
+            s.shard_transactions.append(s.transaction)
         s.communicator.comm.send(s.shard_transactions, dest=0)
 
     def account_balanace(s, transactions):
         transactions_removed = deepcopy(transactions)
-        for index, shard_trans in enumerate(transactions):
-            for trans in shard_trans:
-                sacc = next((ind, acc) for ind, acc in enumerate(s.accounts_info) if acc["id"] == trans["sender"])
-                racc = next((ind, acc) for ind, acc in enumerate(s.accounts_info) if acc["id"] == trans["receiver"])
-                if trans["amount"] <= sacc[1]["money"]:
-                    s.accounts_info[sacc[0]]["money"] -= trans["amount"]
-                    s.accounts_info[racc[0]]["money"] += trans["amount"]
+
+        for index, shard_trans in enumerate(transactions_removed):
+            indexes = []
+            for ind, trans in enumerate(shard_trans):
+                sacc = next((ind, acc) for ind, acc in enumerate(s.accounts_info) if acc["id"] == trans.sender_id)
+                racc = next((ind, acc) for ind, acc in enumerate(s.accounts_info) if acc["id"] == trans.receiving_id)
+                if trans.amount <= sacc[1]["money"]:
+                    s.accounts_info[sacc[0]]["money"] -= trans.amount
+                    s.accounts_info[racc[0]]["money"] += trans.amount
                 else:
-                    transactions_removed[index].remove(trans)
-        transactions = transactions_removed
+                    indexes.append(ind)
+            for i in indexes[::-1]:
+                del transactions[index][i]
+
         #Dodaje wszystkim po 20 poniewaz beda palone stawki przy tworzeniu zlych BLOKÓW i nie chce zeby ludzie sie wykosztowali
         for account in s.accounts_info:
             account["money"] += s.config.added_paid_every_tick
@@ -201,7 +209,7 @@ class Network:
         send_transactions = deepcopy(transactions)
         for index, shard_trans in enumerate(transactions):
             for tran in shard_trans:
-                shard_odbierajacy = next(acc["shard"] for acc in s.accounts_info if acc["id"] == tran["receiver"])
+                shard_odbierajacy = next(acc["shard"] for acc in s.accounts_info if acc["id"] == tran.receiving_id)
                 if shard_odbierajacy != index + 1:
                     send_transactions[shard_odbierajacy - 1].append(tran)
         for index, shard_trans in enumerate(send_transactions):
@@ -214,13 +222,11 @@ class Network:
         money_in_block = 0
         while random() > 0.5:
             for tran in range(s.config.transactionsPerBlock): #DODAJEMY BLOK ROZGALEZIONY Z ZLYMI, LOSOWYMI TRANSAKCJAMI
-                fake_transaction = {
-                    "ID": f"{s.communicator.rank}x{randrange(10**50, 10**51)}",  # id transakcji -->numeru wysylajacego sharda
-                    "sender": choice(list(s.peers_of_nodes_in_shard)),
-                    "receiver": choice(list(s.peers_of_nodes_in_shard)),
-                    "amount": choice(range(1, s.config.max_pay))
-                }
-                money_in_block += fake_transaction["amount"]
+                sender = choice(list(s.peers_of_nodes_in_shard))
+                receiver = choice(list(s.peers_of_nodes_in_shard))
+                amount = choice(range(1, s.config.max_pay))
+                fake_transaction = Transaction(sender, receiver, amount)
+                money_in_block += fake_transaction.amount
                 fake_transactions.append(fake_transaction)
             staker = choice(list(s.peers_of_nodes_in_shard.keys()))
             stake = choice(list(range(money_in_block+1, s.config.max_stake+1)))
@@ -231,7 +237,7 @@ class Network:
 
         received_transactions = s.communicator.comm.recv(source=0)
         for tran in received_transactions:
-            money_in_block += tran['amount']
+            money_in_block += tran.amount
         staker = choice(list(s.peers_of_nodes_in_shard.keys()))
         stake = choice(list(range(money_in_block, s.config.max_stake + 1)))
         s.block = Block(received_transactions, s.shard_blockchain[-1].block_id, time(), staker, stake)
@@ -345,8 +351,6 @@ class Network:
 
     """receive ids to change"""
     def change_node_ids(s, change_ids):   # W SUMIE TO SLABE BO ZAMIENIA WEZLAMI ,ALE TAK NAPRAWDE POWINNO BYC USUWANKO I POTEM DOBIOR WEZLOW TAK JAK NA GORZE ROBILEM, ALE JUZ NIE CHCE MI SIE
-        print(change_ids)
-        print(s.peers_of_nodes_in_shard, s.node_ids, s.communicator.rank, "wszystko czego dzis chce \n")
         new_peers_of_nodes_in_shard = deepcopy(s.peers_of_nodes_in_shard)
         for key, val in new_peers_of_nodes_in_shard.items():
             for change in change_ids:
@@ -363,14 +367,10 @@ class Network:
                 s.peers_of_nodes_in_shard.pop(change[0])
 
 
-
-
-        print(s.node_ids, s.communicator.rank, "wszystko czego dzis chce \n")
         for change in change_ids:
             for index, node in enumerate(s.node_ids):
                 if node == change[0]:
                     s.node_ids[index] = change[1]
-        print(s.node_ids, s.communicator.rank, "auu \n")
 
 
 

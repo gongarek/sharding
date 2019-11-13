@@ -15,9 +15,10 @@ class Block:
     def create_tree(self):
         if self.transaction is not None:
             for tran in self.transaction:
-                tran_string = ''
-                for element in tran.values():
-                    tran_string += (" " + str(element))
+                tran_string = f"{tran.trans_id} {tran.sender_id} {tran.receiving_id} {tran.amount}"
+                # tran_string = ''
+                # for element in tran.values():
+                #     tran_string += (" " + str(element))
                 self.mt.add_leaf(tran_string, True)
         self.mt.make_tree()
         self.block_id = hash((self.mt.get_merkle_root(), self.block_time, self.parent))
